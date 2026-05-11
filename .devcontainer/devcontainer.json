@@ -1,26 +1,54 @@
 {
-  "name": "ecasim — RWE External Control Arm",
-  "image": "ghcr.io/rocker-org/devcontainer/tidyverse:4.4",
-  "features": {
-    "ghcr.io/rocker-org/devcontainer-features/quarto-cli:1": {},
-    "ghcr.io/rocker-org/devcontainer-features/r-packages:1": {
-      "packages": "MatchIt,survival,survminer,broom,gtsummary,tibble,rlang,devtools,roxygen2,testthat,knitr,rmarkdown,renv"
+    "name": "ecasim - RWE External Control Arm Simulation",
+    // Rocker image: R 4.4 + tidyverse + Quarto already installed.
+    // Pulling this is much faster than building R from scratch.
+    "image": "ghcr.io/rocker-org/devcontainer/tidyverse:4.4",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "r.rpath.linux": "/usr/local/bin/R",
+                "r.bracketedPaste": true,
+                "r.plot.useHttpgd": true
+            },
+            "extensions": [
+                "reditorsupport.r",
+                "quarto.quarto",
+                "github.copilot",
+                "github.vscode-pull-request-github",
+                "eamodio.gitlens"
+            ]
+        }
+    },
+    // Install package extras. survminer/ggpubr's transitive deps need
+    // libnlopt-dev (via nloptr) so we apt-install it first.
+    // knitr/rmarkdown/xfun are refreshed because the image ships an older
+    // knitr that calls the now-renamed xfun::attr (-> xfun::attr2).
+    //
+    // R packages installed below cover:
+    //   - DESCRIPTION Imports : broom, dplyr, MatchIt, rlang, survival, tibble
+    //   - DESCRIPTION Suggests: ggplot2, gtsummary, knitr, quarto, survminer, testthat
+    //   - Report (analysis/report.qmd): ecasim, dplyr, ggplot2, survival,
+    //     survminer, gtsummary, broom
+    //   - Dev tooling         : devtools, roxygen2, usethis, testthat, renv, tidyr
+    //   - Quarto/knitr stack  : knitr, rmarkdown, xfun (refreshed)
+    "postCreateCommand": [
+        "bash",
+        "-lc",
+        "apt-get update && apt-get install -y --no-install-recommends libnlopt-dev; Rscript -e 'install.packages(c(\"MatchIt\",\"survival\",\"survminer\",\"broom\",\"gtsummary\",\"ggplot2\",\"tibble\",\"dplyr\",\"tidyr\",\"rlang\",\"quarto\",\"devtools\",\"roxygen2\",\"testthat\",\"usethis\",\"renv\"), repos=\"https://cloud.r-project.org\")'; Rscript -e 'install.packages(c(\"knitr\",\"rmarkdown\",\"xfun\"), repos=\"https://CRAN.R-project.org\")'; Rscript -e 'devtools::install(\".\", upgrade=FALSE)'"
+    ],
+    "remoteUser": "root",
+    // Ports used to view the rendered report in a browser tab.
+    //  - 4848: `quarto preview analysis/report.qmd` default port
+    //  - 8000: `python3 -m http.server 8000 --directory analysis`
+    "forwardPorts": [4848, 8000],
+    "portsAttributes": {
+        "4848": {
+            "label": "Quarto Preview",
+            "onAutoForward": "openPreview"
+        },
+        "8000": {
+            "label": "Report (static)",
+            "onAutoForward": "openPreview"
+        }
     }
-  },
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "REditorSupport.r",
-        "quarto.quarto",
-        "GitHub.vscode-pull-request-github",
-        "eamodio.gitlens"
-      ],
-      "settings": {
-        "r.rterm.linux": "/usr/local/bin/R",
-        "r.bracketedPaste": true
-      }
-    }
-  },
-  "postCreateCommand": "Rscript -e 'if (file.exists(\"DESCRIPTION\")) devtools::install_deps(dependencies = TRUE)'",
-  "remoteUser": "rstudio"
 }
