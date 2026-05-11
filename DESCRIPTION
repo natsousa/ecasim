@@ -1,0 +1,40 @@
+Package: ecasim
+Title: External Control Arm Construction with Propensity Score Methods
+Version: 0.1.0
+Authors@R:
+    person(given = "RWE",
+           family = "Demo",
+           email = "rwe-demo@example.com",
+           role = c("aut", "cre"))
+Description: Educational R package illustrating how to build an external
+    control arm (ECA) from synthetic real-world data to contextualize a
+    single-arm early-phase oncology trial. Provides utilities to simulate
+    a confounded EHR-like cohort, fit a propensity score model, perform
+    nearest-neighbor matching and inverse probability of treatment
+    weighting (IPTW), and estimate a treatment effect on a time-to-event
+    endpoint via Cox proportional hazards. Designed to support a
+    reproducible Quarto analysis report suitable for regulated review
+    contexts (e.g., FDA, EMA).
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Depends:
+    R (>= 4.3)
+Imports:
+    broom,
+    dplyr,
+    MatchIt,
+    rlang,
+    survival,
+    tibble
+Suggests:
+    ggplot2,
+    gtsummary,
+    knitr,
+    quarto,
+    survminer,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+URL: https://github.com/your-org/ecasim
+BugReports: https://github.com/your-org/ecasim/issues

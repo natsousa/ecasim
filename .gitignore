@@ -1,0 +1,36 @@
+# History
+.Rhistory
+.Rapp.history
+
+# Session
+.RData
+.RDataTmp
+.Rproj.user/
+
+# Build outputs
+*.tar.gz
+*.Rcheck/
+docs/
+
+# Quarto
+/.quarto/
+/_freeze/
+analysis/report.html
+analysis/report_files/
+analysis/*.pdf
+
+# renv
+renv/library/
+renv/local/
+renv/cellar/
+renv/lock/
+renv/python/
+renv/staging/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp

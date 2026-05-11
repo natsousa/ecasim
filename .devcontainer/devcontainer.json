@@ -1,0 +1,26 @@
+{
+  "name": "ecasim — RWE External Control Arm",
+  "image": "ghcr.io/rocker-org/devcontainer/tidyverse:4.4",
+  "features": {
+    "ghcr.io/rocker-org/devcontainer-features/quarto-cli:1": {},
+    "ghcr.io/rocker-org/devcontainer-features/r-packages:1": {
+      "packages": "MatchIt,survival,survminer,broom,gtsummary,tibble,rlang,devtools,roxygen2,testthat,knitr,rmarkdown,renv"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "REditorSupport.r",
+        "quarto.quarto",
+        "GitHub.vscode-pull-request-github",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "r.rterm.linux": "/usr/local/bin/R",
+        "r.bracketedPaste": true
+      }
+    }
+  },
+  "postCreateCommand": "Rscript -e 'if (file.exists(\"DESCRIPTION\")) devtools::install_deps(dependencies = TRUE)'",
+  "remoteUser": "rstudio"
+}

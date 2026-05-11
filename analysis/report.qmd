@@ -1,0 +1,224 @@
+---
+title: "External Control Arm for an Early-Phase Oncology Trial"
+subtitle: "A reproducible RWE walkthrough using propensity score methods"
+author: "RWE Demo"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: show
+    theme: cosmo
+    embed-resources: true
+bibliography: references.bib
+csl: https://www.zotero.org/styles/vancouver
+---
+
+```{r setup}
+#| include: false
+library(ecasim)
+library(dplyr)
+library(ggplot2)
+library(survival)
+library(survminer)
+library(gtsummary)
+library(broom)
+
+set.seed(2026)
+theme_set(theme_minimal(base_size = 12))
+```
+
+# Background and objective
+
+In early clinical development (Phase I / II), a single-arm trial design
+is often used to accelerate decision-making in oncology. However,
+without a randomized comparator it is difficult to attribute observed
+outcomes to the investigational treatment rather than to patient
+selection or natural disease history. **External control arms (ECA)**
+constructed from real-world data (RWD) — such as electronic health
+records (EHR), claims, or registries — provide a way to contextualize
+single-arm trial results [@rahman2021fdaeca; @ema2020rwe].
+
+This report walks through, end to end, how to build and analyze an ECA
+using **propensity score matching** and **inverse probability of
+treatment weighting (IPTW)**, with all code and data fully
+reproducible.
+
+::: {.callout-note}
+## Learning objective
+By the end of this report you should be able to:
+
+1.  Recognize the sources of confounding when comparing a trial cohort
+    to RWD.
+2.  Estimate a propensity score, match patients, and compute IPT
+    weights.
+3.  Diagnose covariate balance before and after adjustment.
+4.  Estimate and interpret a treatment effect (HR) on a time-to-event
+    endpoint using Cox proportional hazards.
+5.  Produce a regulator-style report that is fully reproducible.
+:::
+
+# Data: a synthetic but realistic RWD cohort
+
+For teaching purposes we generate a synthetic dataset whose structure
+mirrors an oncology RWD source. The trial cohort is drawn from the
+**same** underlying population as the external controls but is
+preferentially enriched for younger, fitter patients (lower ECOG, more
+favorable biomarker, fewer prior lines). This is the kind of
+selection bias one always faces when comparing trials to RWD.
+
+```{r data}
+cohort <- simulate_rwd(n_trial = 80, n_external = 800, seed = 42)
+glimpse(cohort)
+```
+
+# Baseline characteristics
+
+```{r tbl1}
+cohort |>
+  mutate(arm = factor(treatment, levels = c(0, 1),
+                      labels = c("RWD control", "Trial"))) |>
+  select(arm, age, sex, ecog, biomarker, prior_lines) |>
+  tbl_summary(
+    by = arm,
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    )
+  ) |>
+  add_p() |>
+  add_overall() |>
+  modify_caption("**Table 1. Baseline characteristics, unadjusted.**")
+```
+
+The trial arm is systematically different from the RWD pool. A naive
+comparison of survival between the two arms would attribute part of
+this baseline difference to the treatment. We need to adjust for
+confounders.
+
+# Propensity score estimation
+
+A **propensity score** is the probability of being in the trial arm
+given baseline covariates [@rosenbaum1983propensity]. Conditioning on
+the propensity score balances those covariates between arms.
+
+```{r ps}
+weighted <- compute_iptw(cohort)
+ggplot(weighted, aes(x = ps, fill = factor(treatment))) +
+  geom_density(alpha = 0.5) +
+  scale_fill_manual(values = c("0" = "#4C78A8", "1" = "#F58518"),
+                    labels = c("RWD control", "Trial"),
+                    name = NULL) +
+  labs(title = "Propensity score distribution by arm",
+       x = "Estimated propensity score", y = "Density") +
+  theme(legend.position = "top")
+```
+
+The two distributions overlap, which is the **positivity** assumption
+needed for valid causal inference. Without overlap we cannot construct
+a credible ECA in the regions of non-overlap.
+
+# Approach 1: Propensity score matching (3:1)
+
+We match each trial patient to up to 3 RWD controls within a caliper
+of 0.2 SD on the logit-PS scale.
+
+```{r match}
+matched <- match_eca(cohort, ratio = 3, caliper = 0.2)
+table(matched$treatment)
+```
+
+## Balance diagnostics
+
+```{r balance}
+balance_tbl <- function(d) {
+  d |>
+    mutate(arm = factor(treatment, levels = c(0,1),
+                        labels = c("RWD control", "Trial"))) |>
+    select(arm, age, sex, ecog, biomarker, prior_lines) |>
+    tbl_summary(by = arm,
+                statistic = list(all_continuous() ~ "{mean} ({sd})"))
+}
+balance_tbl(matched) |>
+  modify_caption("**Table 2. Baseline characteristics after matching.**")
+```
+
+After matching, mean age, ECOG distribution and biomarker level are
+much closer between arms.
+
+# Approach 2: IPTW (stabilized weights)
+
+```{r iptw-summary}
+summary(weighted$siptw)
+```
+
+Extreme weights inflate variance. Truncation at the 1st/99th percentile
+is a common stabilization.
+
+```{r iptw-truncate}
+q <- quantile(weighted$siptw, c(0.01, 0.99))
+weighted$siptw_trunc <- pmin(pmax(weighted$siptw, q[1]), q[2])
+```
+
+# Treatment effect on overall survival
+
+## Kaplan–Meier on the matched cohort
+
+```{r km}
+fit_km <- survfit(Surv(time_months, event) ~ treatment, data = matched)
+ggsurvplot(fit_km, data = matched, risk.table = TRUE,
+           conf.int = TRUE, palette = c("#4C78A8", "#F58518"),
+           legend.labs = c("RWD control (matched)", "Trial"),
+           xlab = "Months since index", ylab = "Overall survival")
+```
+
+## Cox proportional hazards — three estimators
+
+```{r hr-table}
+hr_naive   <- fit_cox(cohort)              |> mutate(method = "Unadjusted")
+hr_matched <- fit_cox(matched)             |> mutate(method = "PS matching (3:1)")
+hr_iptw    <- fit_cox(weighted, weights = weighted$siptw_trunc) |>
+              mutate(method = "Stabilized IPTW")
+
+bind_rows(hr_naive, hr_matched, hr_iptw) |>
+  filter(term == "treatment") |>
+  transmute(method,
+            HR        = round(estimate, 2),
+            `95% CI`  = sprintf("%.2f – %.2f", conf.low, conf.high),
+            `p-value` = signif(p.value, 3)) |>
+  knitr::kable(caption = "Estimated treatment effect on OS by method.")
+```
+
+The unadjusted HR is biased downward (artificially favorable to
+treatment) because the trial arm starts healthier. After PS adjustment
+the estimate is closer to the true generative HR of **0.70**.
+
+# Sensitivity considerations
+
+For a regulatory submission you would additionally:
+
+- pre-specify the analysis plan and lock the protocol;
+- assess unmeasured confounding via the **E-value** [@vanderweele2017evalue];
+- run quantitative bias analyses;
+- repeat with alternate matching ratios, calipers, and weight
+  truncation thresholds;
+- assess the **proportional hazards** assumption (Schoenfeld residuals);
+- consider doubly-robust estimators (e.g., AIPW, TMLE).
+
+# Reproducibility
+
+```{r repro}
+sessionInfo()
+```
+
+The exact R version and package versions are pinned via the
+`.devcontainer` and the package `DESCRIPTION`.  Every figure and table
+above is regenerated from the same seed (`42`) every time the report is
+rendered — so two reviewers running the report on different machines
+get the same numbers.
+
+# References {.unnumbered}
+
+::: {#refs}
+:::

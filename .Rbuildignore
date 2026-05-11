@@ -1,0 +1,12 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^LICENSE\.md$
+^README\.Rmd$
+^\.github$
+^\.devcontainer$
+^analysis$
+^Makefile$
+^\.gitignore$
+^renv$
+^renv\.lock$
+^\.Rprofile$
