@@ -2,7 +2,7 @@
 
 install:
 	Rscript -e 'devtools::install_deps(dependencies = TRUE)'
-	Rscript -e 'devtools::install(".", upgrade = "never")'
+	Rscript -e 'devtools::install(".", upgrade = FALSE)'
 
 document:
 	Rscript -e 'devtools::document()'

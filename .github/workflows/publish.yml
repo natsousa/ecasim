@@ -48,7 +48,7 @@ jobs:
       - uses: quarto-dev/quarto-actions/setup@v2
 
       - name: Install ecasim package
-        run: Rscript -e 'devtools::install(".", upgrade = "never")'
+        run: Rscript -e 'devtools::install(".", upgrade = FALSE)'
 
       - name: Render Quarto report
         run: quarto render analysis/report.qmd

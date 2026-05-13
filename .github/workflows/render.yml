@@ -34,7 +34,7 @@ jobs:
       - uses: quarto-dev/quarto-actions/setup@v2
 
       - name: Install ecasim package
-        run: Rscript -e 'devtools::install(".", upgrade = "never")'
+        run: Rscript -e 'devtools::install(".", upgrade = FALSE)'
 
       - name: Run unit tests
         run: Rscript -e 'devtools::test(stop_on_failure = TRUE)'
